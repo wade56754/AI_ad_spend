@@ -31,3 +31,4 @@ PROJECT_NAME=广告投手消耗上报系统
 
 3. 区域（region）默认为 ap-southeast-1，如果不同请修改
 
+

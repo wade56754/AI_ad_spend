@@ -175,3 +175,4 @@ CREATE TRIGGER update_monthly_operator_perf_updated_at BEFORE UPDATE ON monthly_
 -- 完成提示
 SELECT '数据库表创建完成！' AS message;
 
+

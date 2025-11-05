@@ -26,3 +26,4 @@ PROJECT_NAME=广告投手消耗上报系统
 $envContent | Out-File -FilePath ".env" -Encoding utf8 -NoNewline
 Write-Host ".env 文件已创建！" -ForegroundColor Green
 
+

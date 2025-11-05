@@ -3,6 +3,7 @@
 运行此脚本来验证数据库连接是否正常
 """
 import sys
+from sqlalchemy import text
 from app.db.session import SessionLocal
 from app.models.project import Project
 
@@ -14,23 +15,28 @@ def test_connection():
     db = SessionLocal()
     try:
         # 测试基本连接
-        result = db.execute("SELECT 1 as test")
-        print("✅ 数据库连接成功！")
+        result = db.execute(text("SELECT 1 as test"))
+        row = result.fetchone()
+        if row:
+            print("[OK] 数据库连接成功！")
+        else:
+            print("[ERROR] 连接测试失败")
+            return False
         
         # 测试查询表
         try:
             count = db.query(Project).count()
-            print(f"✅ 表查询成功！当前有 {count} 个项目")
+            print(f"[OK] 表查询成功！当前有 {count} 个项目")
         except Exception as e:
-            print(f"⚠️  表可能还未创建: {e}")
+            print(f"[WARNING] 表可能还未创建: {e}")
             print("   请执行 init_supabase.sql 创建表")
         
         print("-" * 50)
-        print("✅ 连接测试完成！")
+        print("[OK] 连接测试完成！")
         return True
         
     except Exception as e:
-        print(f"❌ 连接失败: {e}")
+        print(f"[ERROR] 连接失败: {e}")
         print("\n可能的原因：")
         print("1. 数据库密码不正确")
         print("2. 连接字符串格式错误")
@@ -46,4 +52,5 @@ def test_connection():
 if __name__ == "__main__":
     success = test_connection()
     sys.exit(0 if success else 1)
+
 

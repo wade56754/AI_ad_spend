@@ -42,3 +42,4 @@ class AdSpendListResponse(BaseModel):
     meta: Optional[dict] = None
 
 
+

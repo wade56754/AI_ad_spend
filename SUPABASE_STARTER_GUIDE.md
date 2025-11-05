@@ -384,3 +384,4 @@ const { data, error } = await supabase
 
 现在你可以同时使用 Supabase 的便利功能和 FastAPI 的强大后端！
 
+

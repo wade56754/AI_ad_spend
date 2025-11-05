@@ -176,3 +176,4 @@ A: 可以，使用 Supabase 的远程数据库，或者使用 Supabase CLI 运�
 **Q: 如何备份数据库？**
 A: 在 Supabase Dashboard → Settings → Database → Backups 可以设置自动备份。
 
+

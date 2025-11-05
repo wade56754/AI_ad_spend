@@ -41,3 +41,4 @@ class AdSpendListResponse(BaseModel):
     error: Optional[str] = None
     meta: Optional[dict] = None
 
+

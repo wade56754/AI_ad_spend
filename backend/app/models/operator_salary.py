@@ -22,3 +22,4 @@ class OperatorSalary(Base):
     # 关系
     operator = relationship("Operator", backref="salaries")
 
+

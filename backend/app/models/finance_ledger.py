@@ -27,3 +27,4 @@ class LedgerTransaction(Base):
     operator = relationship("Operator", back_populates="ledger_transactions")
     reconciliations = relationship("Reconciliation", back_populates="ledger_transaction", cascade="all, delete-orphan")
 
+

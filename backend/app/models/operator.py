@@ -22,3 +22,4 @@ class Operator(Base):
     spend_reports = relationship("AdSpendDaily", back_populates="operator", cascade="all, delete-orphan")
     ledger_transactions = relationship("LedgerTransaction", back_populates="operator")
 
+

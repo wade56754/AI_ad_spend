@@ -25,3 +25,4 @@ class AdSpendDaily(Base):
     operator = relationship("Operator", back_populates="spend_reports")
     reconciliations = relationship("Reconciliation", back_populates="ad_spend", cascade="all, delete-orphan")
 
+

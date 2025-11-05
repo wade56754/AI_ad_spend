@@ -21,3 +21,4 @@ class Project(Base):
     ledger_transactions = relationship("LedgerTransaction", back_populates="project")
     operators = relationship("Operator", back_populates="project")
 
+

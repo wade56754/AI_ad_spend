@@ -6,7 +6,7 @@
 
 - **前端**: Next.js + Tailwind CSS
 - **后端**: FastAPI + PostgreSQL
-- **数据库**: PostgreSQL
+- **数据库**: Supabase (PostgreSQL) / 本地 PostgreSQL
 
 ## 功能特性
 
@@ -60,10 +60,25 @@ pip install -r requirements.txt
 ```
 
 2. 配置环境变量（创建 `.env` 文件）：
-```
-DATABASE_URL=postgresql://user:password@localhost/dbname
+
+**使用 Supabase（推荐）**：
+```env
+# Supabase 连接池 URL（推荐）
+DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
+
+# 或直接连接 URL
+# DATABASE_URL=postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
+
 SECRET_KEY=your-secret-key
 ```
+
+**使用本地 PostgreSQL**：
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/ad_spend_db
+SECRET_KEY=your-secret-key
+```
+
+详细配置请参考 [Supabase 集成指南](backend/SUPABASE_SETUP.md)
 
 3. 运行数据库迁移（需要先配置 Alembic）
 
@@ -73,6 +88,16 @@ uvicorn app.main:app --reload
 ```
 
 ### 前端设置
+
+有两种方式创建前端：
+
+#### 方式 1: 使用 Bolt.new 生成（推荐）
+
+1. 访问 [Bolt.new](https://bolt.new)
+2. 参考 [Bolt.new 使用指南](BOLT_NEW_GUIDE.md) 和 [API 文档](API_DOCUMENTATION.md)
+3. 将生成的代码导出到 `frontend` 目录
+
+#### 方式 2: 使用现有代码
 
 1. 安装依赖：
 ```bash
@@ -112,4 +137,5 @@ npm run dev
 ## 许可证
 
 MIT License
+
 

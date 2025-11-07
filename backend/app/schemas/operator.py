@@ -47,3 +47,4 @@ class OperatorListResponse(BaseModel):
     error: Optional[str] = None
     meta: Optional[dict] = None
 
+

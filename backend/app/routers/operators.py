@@ -1,63 +1,113 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+"""Operator management endpoints."""
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, Path, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import desc
-from typing import Optional, List
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
 from app.db.session import get_db
 from app.models.operator import Operator
-from app.schemas.operator import (
-    OperatorCreate,
-    OperatorUpdate,
-    OperatorResponse,
-    OperatorListResponse
-)
-
-router = APIRouter(prefix="/operators", tags=["投手管理"])
+from app.utils.responses import failure, success
 
 
-@router.get("", response_model=OperatorListResponse)
-def get_operators(
-    skip: int = Query(0, ge=0, description="跳过记录数"),
-    limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
-    project_id: Optional[int] = Query(None, description="项目ID筛选"),
-    status: Optional[str] = Query(None, description="状态筛选"),
-    db: Session = Depends(get_db)
-):
-    """获取投手列表"""
+class OperatorCreateBody(BaseModel):
+    name: str = Field(..., max_length=100)
+    project_id: Optional[int] = Field(None, ge=1)
+    auth_user_id: Optional[str] = Field(None, max_length=255)
+    status: str = Field(default="active", max_length=20)
+
+
+class OperatorUpdateBody(BaseModel):
+    name: Optional[str] = Field(None, max_length=100)
+    project_id: Optional[int] = Field(None, ge=1)
+    auth_user_id: Optional[str] = Field(None, max_length=255)
+    status: Optional[str] = Field(None, max_length=20)
+
+
+router = APIRouter(prefix="/operators", tags=["Operators"])
+
+
+def _serialize(operator: Operator) -> Dict[str, Any]:
+    return {
+        "id": operator.id,
+        "name": operator.name,
+        "project_id": operator.project_id,
+        "auth_user_id": operator.employee_id,
+        "status": operator.status,
+        "created_at": operator.created_at.isoformat() if operator.created_at else None,
+        "updated_at": operator.updated_at.isoformat() if operator.updated_at else None,
+    }
+
+
+@router.get("")
+@router.get("/")
+def list_operators(
+    project_id: Optional[int] = Query(None, ge=1, description="filter by project"),
+    status: Optional[str] = Query(None, description="filter by status"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    query = db.query(Operator)
+
+    if project_id is not None:
+        query = query.filter(Operator.project_id == project_id)
+
+    if status is not None:
+        query = query.filter(Operator.status == status)
+
+    operators: List[Operator] = query.order_by(desc(Operator.created_at)).all()
+    return success(data=[_serialize(operator) for operator in operators], meta={"total": len(operators)})
+
+
+@router.post("")
+@router.post("/")
+def create_operator(
+    *,
+    body: OperatorCreateBody,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    operator = Operator(
+        name=body.name,
+        project_id=body.project_id,
+        employee_id=body.auth_user_id,
+        role='operator',
+        status=body.status,
+    )
+
     try:
-        query = db.query(Operator)
+        db.add(operator)
+        db.commit()
+        db.refresh(operator)
+        return success(data=_serialize(operator), meta={"message": "operator_created"})
+    except SQLAlchemyError:
+        db.rollback()
+        return failure("db_error")
 
-        if project_id:
-            query = query.filter(Operator.project_id == project_id)
-        if status:
-            query = query.filter(Operator.status == status)
 
-        total = query.count()
-        records = query.order_by(desc(Operator.created_at)).offset(skip).limit(limit).all()
+@router.put("/{operator_id}")
+def update_operator(
+    *,
+    operator_id: int = Path(..., ge=1),
+    body: OperatorUpdateBody,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    operator = db.query(Operator).filter(Operator.id == operator_id).first()
+    if operator is None:
+        return failure("operator_not_found")
 
-        data = [
-            OperatorResponse(
-                id=record.id,
-                name=record.name,
-                employee_id=record.employee_id,
-                project_id=record.project_id,
-                role=record.role,
-                status=record.status,
-                created_at=record.created_at.isoformat() if record.created_at else "",
-                updated_at=record.updated_at.isoformat() if record.updated_at else None
-            )
-            for record in records
-        ]
+    update_data = body.model_dump(exclude_unset=True)
 
-        return OperatorListResponse(
-            data=data,
-            error=None,
-            meta={
-                "total": total,
-                "skip": skip,
-                "limit": limit,
-                "has_more": (skip + limit) < total
-            }
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    if "auth_user_id" in update_data:
+        operator.employee_id = update_data.pop("auth_user_id")
 
+    for field, value in update_data.items():
+        setattr(operator, field, value)
+
+    try:
+        db.commit()
+        db.refresh(operator)
+        return success(data=_serialize(operator), meta={"message": "operator_updated"})
+    except SQLAlchemyError:
+        db.rollback()
+        return failure("db_error")

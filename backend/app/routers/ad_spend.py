@@ -1,187 +1,148 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
-from typing import Optional
+# Ad spend report router
 from datetime import date
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
+from sqlalchemy import desc
+from sqlalchemy.orm import Session
+
 from app.db.session import get_db
+from app.models.channel import Channel
+from app.models.operator import Operator
+from app.models.project import Project
 from app.models.spend_report import AdSpendDaily
-from app.schemas.spend_report import (
-    AdSpendCreate,
-    AdSpendResponse,
-    AdSpendListResponse
-)
-
-router = APIRouter(prefix="/ad-spend", tags=["投手消耗上报"])
+from app.utils.responses import failure, success
 
 
-@router.get("", response_model=AdSpendListResponse)
-def get_ad_spend(
-    skip: int = Query(0, ge=0, description="跳过记录数"),
-    limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
-    project_id: Optional[int] = Query(None, description="项目ID筛选"),
-    channel_id: Optional[int] = Query(None, description="渠道ID筛选"),
-    operator_id: Optional[int] = Query(None, description="投手ID筛选"),
-    start_date: Optional[date] = Query(None, description="开始日期"),
-    end_date: Optional[date] = Query(None, description="结束日期"),
-    db: Session = Depends(get_db)
-):
-    """获取投手消耗上报列表"""
+class AdSpendCreateBody(BaseModel):
+    spend_date: date = Field(..., description='spend date')
+    project_id: int = Field(..., description='project id')
+    operator_id: int = Field(..., description='operator id')
+    channel_id: int = Field(..., description='channel id')
+    platform: str = Field(..., max_length=50, description='platform name')
+    amount_usdt: Decimal = Field(..., gt=0, description='spend amount in USDT')
+    remark: Optional[str] = Field(None, max_length=1000, description='optional memo')
+
+
+router = APIRouter(prefix='/api/ad-spend', tags=['Ad Spend'])
+
+
+def _serialize(record: AdSpendDaily) -> Dict[str, Any]:
+    return {
+        'id': record.id,
+        'spend_date': record.spend_date.isoformat() if record.spend_date else None,
+        'project_id': record.project_id,
+        'operator_id': record.operator_id,
+        'channel_id': record.channel_id,
+        'platform': record.platform,
+        'amount_usdt': str(record.amount_usdt) if record.amount_usdt is not None else None,
+        'remark': record.raw_memo,
+        'status': record.status,
+        'created_at': record.created_at.isoformat() if record.created_at else None,
+    }
+
+
+@router.get('/')
+def list_ad_spend(
+    project_id: Optional[int] = Query(None, description='filter by project'),
+    operator_id: Optional[int] = Query(None, description='filter by operator'),
+    channel_id: Optional[int] = Query(None, description='filter by channel'),
+    start_date: Optional[date] = Query(None, description='start date'),
+    end_date: Optional[date] = Query(None, description='end date'),
+    limit: int = Query(50, ge=1, le=1000, description='page size'),
+    offset: int = Query(0, ge=0, description='offset'),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     try:
         query = db.query(AdSpendDaily)
 
-        # 筛选条件
-        if project_id:
+        if project_id is not None:
             query = query.filter(AdSpendDaily.project_id == project_id)
-        if channel_id:
-            query = query.filter(AdSpendDaily.channel_id == channel_id)
-        if operator_id:
+        if operator_id is not None:
             query = query.filter(AdSpendDaily.operator_id == operator_id)
-        if start_date:
+        if channel_id is not None:
+            query = query.filter(AdSpendDaily.channel_id == channel_id)
+        if start_date is not None:
             query = query.filter(AdSpendDaily.spend_date >= start_date)
-        if end_date:
+        if end_date is not None:
             query = query.filter(AdSpendDaily.spend_date <= end_date)
 
-        # 获取总数
         total = query.count()
-
-        # 排序和分页
-        records = query.order_by(desc(AdSpendDaily.spend_date), desc(AdSpendDaily.created_at)).offset(skip).limit(limit).all()
-
-        # 转换为响应格式
-        data = [
-            AdSpendResponse(
-                id=record.id,
-                spend_date=record.spend_date,
-                project_id=record.project_id,
-                channel_id=record.channel_id,
-                country=record.country,
-                operator_id=record.operator_id,
-                platform=record.platform,
-                amount_usdt=record.amount_usdt,
-                raw_memo=record.raw_memo,
-                status=record.status,
-                created_at=record.created_at.isoformat() if record.created_at else None
-            )
-            for record in records
-        ]
-
-        return AdSpendListResponse(
-            data=data,
-            error=None,
-            meta={
-                "total": total,
-                "skip": skip,
-                "limit": limit,
-                "has_more": (skip + limit) < total
-            }
+        records: List[AdSpendDaily] = (
+            query.order_by(desc(AdSpendDaily.spend_date), desc(AdSpendDaily.created_at))
+            .offset(offset)
+            .limit(limit)
+            .all()
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+        meta = {
+            'total': total,
+            'limit': limit,
+            'offset': offset,
+            'has_more': (offset + limit) < total,
+        }
+        data = [_serialize(record) for record in records]
+        return success(data=data, meta=meta)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        return failure(str(exc))
 
 
-@router.post("", response_model=dict)
+@router.post('/')
 def create_ad_spend(
-    spend_data: AdSpendCreate,
-    db: Session = Depends(get_db)
-):
-    """创建投手消耗上报"""
+    *,
+    body: AdSpendCreateBody,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     try:
-        # 验证项目是否存在
-        from app.models.project import Project
-        project = db.query(Project).filter(Project.id == spend_data.project_id).first()
-        if not project:
-            return {
-                "data": None,
-                "error": f"项目ID {spend_data.project_id} 不存在",
-                "meta": None
-            }
+        project = db.query(Project).filter(Project.id == body.project_id).first()
+        if project is None:
+            return failure(f'project {body.project_id} not found')
 
-        # 验证投手是否存在
-        from app.models.operator import Operator
-        operator = db.query(Operator).filter(Operator.id == spend_data.operator_id).first()
-        if not operator:
-            return {
-                "data": None,
-                "error": f"投手ID {spend_data.operator_id} 不存在",
-                "meta": None
-            }
+        operator = db.query(Operator).filter(Operator.id == body.operator_id).first()
+        if operator is None:
+            return failure(f'operator {body.operator_id} not found')
 
-        # 验证渠道是否存在（必填字段）
-        from app.models.channel import Channel
-        channel = db.query(Channel).filter(Channel.id == spend_data.channel_id).first()
-        if not channel:
-            return {
-                "data": None,
-                "error": f"渠道ID {spend_data.channel_id} 不存在",
-                "meta": None
-            }
-        
-        # 异常检测：检查与前一条记录的金额差异
-        warning = None
-        previous_spend = db.query(AdSpendDaily).filter(
-            AdSpendDaily.operator_id == spend_data.operator_id,
-            AdSpendDaily.project_id == spend_data.project_id,
-            AdSpendDaily.channel_id == spend_data.channel_id,
-            AdSpendDaily.platform == spend_data.platform
-        ).order_by(desc(AdSpendDaily.spend_date), desc(AdSpendDaily.created_at)).first()
-        
-        if previous_spend:
-            amount_diff = abs(float(spend_data.amount_usdt) - float(previous_spend.amount_usdt))
-            amount_diff_percent = (amount_diff / float(previous_spend.amount_usdt)) * 100 if float(previous_spend.amount_usdt) > 0 else 0
-            
-            if amount_diff_percent > 30:
-                warning = "金额与上一条差异较大，请确认"
+        channel = db.query(Channel).filter(Channel.id == body.channel_id).first()
+        if channel is None:
+            return failure(f'channel {body.channel_id} not found')
 
-        # 创建记录
-        new_spend = AdSpendDaily(
-            spend_date=spend_data.spend_date,
-            project_id=spend_data.project_id,
-            channel_id=spend_data.channel_id,
-            country=spend_data.country,
-            operator_id=spend_data.operator_id,
-            platform=spend_data.platform,
-            amount_usdt=spend_data.amount_usdt,
-            raw_memo=spend_data.raw_memo,
-            status="pending"
+        previous = (
+            db.query(AdSpendDaily)
+            .filter(AdSpendDaily.operator_id == body.operator_id)
+            .order_by(desc(AdSpendDaily.spend_date), desc(AdSpendDaily.created_at))
+            .first()
         )
 
-        db.add(new_spend)
+        warning: Optional[str] = None
+        if previous is not None and previous.amount_usdt is not None:
+            prev_amount = Decimal(previous.amount_usdt)
+            if prev_amount > 0:
+                diff_ratio = abs(body.amount_usdt - prev_amount) / prev_amount
+                if diff_ratio > Decimal('0.3'):
+                    warning = 'amount_diff_gt_30'
+
+        record = AdSpendDaily(
+            spend_date=body.spend_date,
+            project_id=body.project_id,
+            operator_id=body.operator_id,
+            channel_id=body.channel_id,
+            platform=body.platform,
+            amount_usdt=body.amount_usdt,
+            raw_memo=body.remark,
+            status='pending',
+        )
+
+        db.add(record)
         db.commit()
-        db.refresh(new_spend)
+        db.refresh(record)
 
-        # 构建响应
-        response_data = AdSpendResponse(
-            id=new_spend.id,
-            spend_date=new_spend.spend_date,
-            project_id=new_spend.project_id,
-            channel_id=new_spend.channel_id,
-            country=new_spend.country,
-            operator_id=new_spend.operator_id,
-            platform=new_spend.platform,
-            amount_usdt=new_spend.amount_usdt,
-            raw_memo=new_spend.raw_memo,
-            status=new_spend.status,
-            created_at=new_spend.created_at.isoformat() if new_spend.created_at else None
-        )
+        meta: Dict[str, Any] = {}
+        if warning is not None:
+            meta['warning'] = warning
 
-        result = {
-            "data": response_data.model_dump(),
-            "error": None,
-            "meta": {"message": "消耗上报创建成功"}
-        }
-        
-        # 如果有警告，添加到响应中
-        if warning:
-            result["warning"] = warning
-        
-        return result
-    except Exception as e:
+        return success(data=_serialize(record), meta=meta)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
         db.rollback()
-        return {
-            "data": None,
-            "error": str(e),
-            "meta": None
-        }
-
-
-
+        return failure(str(exc))

@@ -52,3 +52,4 @@ class MonthlyChannelPerformance(Base):
     # 关系
     channel = relationship("Channel", back_populates="monthly_performances")
 
+

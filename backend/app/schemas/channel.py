@@ -72,3 +72,4 @@ class MonthlyChannelPerformanceResponse(BaseModel):
     class Config:
         from_attributes = True
 
+

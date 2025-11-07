@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { postAdSpend } from '@/lib/api';
+import * as React from 'react';
+import { postAdSpend, getProjects, getProjectChannels, getOperators } from '@/lib/api';
 
 export default function SpendReportPage() {
   const [formData, setFormData] = useState({
     spend_date: '',
     project_id: '',
+    channel_id: '',
     country: '',
     operator_id: '',
     platform: '',
@@ -17,16 +19,58 @@ export default function SpendReportPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{
-    type: 'success' | 'error' | null;
+    type: 'success' | 'error' | 'warning' | null;
     message: string;
   }>({ type: null, message: '' });
 
-  // 模拟项目列表（实际应从 API 获取）
-  const projects = [
-    { id: 1, name: '项目A' },
-    { id: 2, name: '项目B' },
-    { id: 3, name: '项目C' },
-  ];
+  const [projects, setProjects] = useState<Array<{ id: number; name: string }>>([]);
+  const [channels, setChannels] = useState<Array<{ id: number; name: string }>>([]);
+  const [projectChannels, setProjectChannels] = useState<Array<{ id: number; name: string }>>([]);
+
+  // 加载项目和渠道列表
+  React.useEffect(() => {
+    const loadData = async () => {
+      try {
+        // 加载项目列表
+        const projectsRes = await getProjects({ status: 'active' });
+        if (projectsRes.data) {
+          setProjects(projectsRes.data);
+        }
+      } catch (error) {
+        console.error('加载项目列表失败:', error);
+      }
+    };
+    loadData();
+  }, []);
+
+  // 当项目改变时，加载该项目关联的渠道和投手
+  React.useEffect(() => {
+    const loadProjectData = async () => {
+      if (formData.project_id) {
+        try {
+          // 加载项目关联的渠道
+          const channelsRes = await getProjectChannels(parseInt(formData.project_id));
+          if (channelsRes.data) {
+            setProjectChannels(channelsRes.data);
+          }
+          
+          // 加载项目关联的投手
+          const operatorsRes = await getOperators({ 
+            project_id: parseInt(formData.project_id),
+            status: 'active'
+          });
+          if (operatorsRes.data) {
+            // 这里可以设置投手列表，如果需要的话
+          }
+        } catch (error) {
+          console.error('加载项目数据失败:', error);
+        }
+      } else {
+        setProjectChannels([]);
+      }
+    };
+    loadProjectData();
+  }, [formData.project_id]);
 
   // 模拟国家列表
   const countries = [
@@ -42,6 +86,10 @@ export default function SpendReportPage() {
 
     if (!formData.project_id) {
       newErrors.project_id = '请选择项目';
+    }
+
+    if (!formData.channel_id) {
+      newErrors.channel_id = '请选择渠道（必填）';
     }
 
     if (!formData.operator_id) {
@@ -70,6 +118,7 @@ export default function SpendReportPage() {
       const response = await postAdSpend({
         spend_date: formData.spend_date,
         project_id: parseInt(formData.project_id),
+        channel_id: parseInt(formData.channel_id),
         country: formData.country || undefined,
         operator_id: parseInt(formData.operator_id),
         platform: formData.platform || undefined,
@@ -83,14 +132,17 @@ export default function SpendReportPage() {
           message: response.error || '提交失败，请重试',
         });
       } else {
+        // 检查是否有警告
+        const warningMessage = (response as any).warning;
         setSubmitStatus({
-          type: 'success',
-          message: '消耗上报提交成功！',
+          type: warningMessage ? 'warning' : 'success',
+          message: warningMessage || '消耗上报提交成功！',
         });
         // 重置表单
         setFormData({
           spend_date: '',
           project_id: '',
+          channel_id: '',
           country: '',
           operator_id: '',
           platform: '',
@@ -132,6 +184,8 @@ export default function SpendReportPage() {
               className={`mb-6 p-4 rounded-md ${
                 submitStatus.type === 'success'
                   ? 'bg-green-50 text-green-800 border border-green-200'
+                  : submitStatus.type === 'warning'
+                  ? 'bg-yellow-50 text-yellow-800 border border-yellow-200'
                   : 'bg-red-50 text-red-800 border border-red-200'
               }`}
             >
@@ -183,6 +237,36 @@ export default function SpendReportPage() {
               </select>
               {errors.project_id && (
                 <p className="mt-1 text-sm text-red-600">{errors.project_id}</p>
+              )}
+            </div>
+
+            {/* 渠道 */}
+            <div>
+              <label htmlFor="channel_id" className="block text-sm font-medium text-gray-700 mb-1">
+                渠道 <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="channel_id"
+                name="channel_id"
+                value={formData.channel_id}
+                onChange={handleChange}
+                disabled={!formData.project_id}
+                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.channel_id ? 'border-red-500' : 'border-gray-300'
+                } ${!formData.project_id ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              >
+                <option value="">请选择渠道</option>
+                {projectChannels.map(channel => (
+                  <option key={channel.id} value={channel.id}>
+                    {channel.name}
+                  </option>
+                ))}
+              </select>
+              {errors.channel_id && (
+                <p className="mt-1 text-sm text-red-600">{errors.channel_id}</p>
+              )}
+              {!formData.project_id && (
+                <p className="mt-1 text-sm text-gray-500">请先选择项目</p>
               )}
             </div>
 

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import ad_spend, ledger, reconciliation, analytics
+from app.routers import ad_spend, ledger, reconciliation, analytics, channels, projects, operators
 
 app = FastAPI(
     title="广告投手消耗上报系统",
@@ -22,6 +22,9 @@ app.include_router(ad_spend.router, prefix="/api")
 app.include_router(ledger.router, prefix="/api")
 app.include_router(reconciliation.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
+app.include_router(channels.router, prefix="/api")
+app.include_router(projects.router, prefix="/api")
+app.include_router(operators.router, prefix="/api")
 
 
 @app.get("/")

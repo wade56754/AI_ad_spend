@@ -16,6 +16,7 @@ class AdSpendDaily(Base):
     platform = Column(String(50), comment="投放平台")
     amount_usdt = Column(Numeric(15, 2), nullable=False, comment="消耗金额(USDT)")
     raw_memo = Column(String(1000), comment="原始备注")
+    channel_id = Column(Integer, ForeignKey("channels.id", ondelete="RESTRICT"), nullable=False, index=True, comment="渠道ID（必填）")
     status = Column(String(20), default="pending", comment="状态：pending/approved/rejected")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), comment="更新时间")
@@ -23,6 +24,7 @@ class AdSpendDaily(Base):
     # 关系
     project = relationship("Project", back_populates="spend_reports")
     operator = relationship("Operator", back_populates="spend_reports")
+    channel = relationship("Channel", back_populates="spend_reports")
     reconciliations = relationship("Reconciliation", back_populates="ad_spend", cascade="all, delete-orphan")
 
 

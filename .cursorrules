@@ -1,0 +1,232 @@
+# AI 财务与投手管理系统 - 项目开发规则
+
+## 项目名称
+AI 财务与投手管理系统
+
+---
+
+## 技术栈约束
+
+### 前端技术栈（必须遵守）
+- **框架**: Next.js 14 (App Router) + TypeScript + Tailwind CSS
+- **禁止使用**: Express、Nest、Django、Laravel 等其他框架
+- **UI组件**: 使用 Tailwind CSS，不要写任何 inline style
+- **状态管理**: React Hooks + Context API
+
+### 后端技术栈（必须遵守）
+- **框架**: FastAPI + Pydantic + SQLAlchemy
+- **禁止使用**: Express、Nest、Django、Laravel 等其他框架
+- **代码风格**: 遵循 PEP8，使用依赖注入写 FastAPI
+
+### 数据库
+- **必须使用**: Supabase (PostgreSQL)
+- **禁止使用**: 本地 SQLite 或其他数据库
+- **迁移工具**: 使用 Alembic 进行数据库迁移
+
+---
+
+## 目录结构约定
+
+### 前端目录结构
+```
+frontend/
+├── app/...              # Next.js App Router 页面
+├── lib/...              # API 封装、supabase 客户端
+├── components/...      # React 组件
+└── hooks/...           # React Hooks
+```
+
+### 后端目录结构
+```
+backend/
+├── app/
+│   ├── main.py         # FastAPI 应用入口
+│   ├── routers/...     # 每个模块的路由
+│   ├── schemas/...     # Pydantic schema
+│   ├── services/...    # 业务逻辑层
+│   ├── models/...      # SQLAlchemy 模型
+│   └── db/...          # 数据库相关
+└── alembic/...         # 数据库迁移
+```
+
+---
+
+## 业务固定规则（禁止更改）
+
+### 日报异常检测规则
+- **异常阈值**: 与同投手、同项目、同平台上一条记录相比，金额波动 > 30% 时
+- **处理方式**: 需要返回 `warning` 字段，但不能阻止保存
+- **返回格式**: `{ "data": {...}, "warning": "金额与上一条差异较大，请确认", "error": null }`
+
+### 自动对账匹配规则
+- **自动匹配条件**: 金额差 ≤ 5% 且 日期差 ≤ 1 天 → 视为自动匹配
+- **待审核条件**: 不满足自动匹配条件 → 标记为 `need_review`
+- **匹配分数**: 基于金额差和日期差的综合评分
+
+### 渠道字段规则
+- **渠道（channel）为必填字段**: 投手上报广告消耗时必须挂渠道
+- **渠道选择**: 前端渠道下拉必须从 `GET /api/channels` 获取，不要写死
+
+### 审计规则
+- **所有写操作**: 必须记录操作人和时间，便于审计
+- **操作日志**: 在数据库表中包含 `created_by`、`updated_by`、`created_at`、`updated_at` 字段
+
+---
+
+## 角色与权限（必须按此实现）
+
+### 角色定义
+| 角色代码 | 角色名称 | 权限说明 |
+|---------|---------|---------|
+| `operator` | 广告投手 | 只能创建和查看「自己的」日报，不允许改别人数据 |
+| `finance` | 财务 | 可以查看全部收支记录、对账结果，可以执行对账 |
+| `account_mgr` | 户管/渠道管理 | 可以管理渠道、下户情况、查看渠道绩效 |
+| `manager` | 管理层 | 只读查看所有统计和分析数据 |
+| `admin` | 系统管理员 | 拥有全部权限 |
+
+### 权限实现要求
+- **前端路由保护**: 根据角色做路由保护，不同角色看不同菜单
+- **后端权限检查**: 所有需要认证的接口必须从请求中解析出用户，并根据角色限制访问
+- **RLS 策略**: Supabase 表启用 RLS，后端代码不能跳过权限检查
+
+---
+
+## API 约定
+
+### 统一响应格式
+所有接口返回统一结构：
+```json
+{
+  "data": ...,
+  "error": null | string,
+  "meta": {}
+}
+```
+
+### 渠道相关接口
+- `GET /api/channels` - 获取渠道列表
+- `POST /api/channels` - 创建渠道
+- `GET /api/channels/{id}` - 获取单个渠道
+- `PUT /api/channels/{id}` - 更新渠道
+- `DELETE /api/channels/{id}` - 删除渠道
+- `GET /api/channels/stats` - 获取渠道统计数据
+- `POST /api/channels/projects/{project_id}/channels` - 关联渠道到项目
+- `DELETE /api/channels/projects/{project_id}/channels/{channel_id}` - 解除关联
+- `GET /api/channels/projects/{project_id}/channels` - 获取项目关联的渠道
+
+### 对账相关接口
+- `POST /api/reconcile/run` - 执行对账
+- `GET /api/reconcile?status=...` - 查询对账结果（支持 status 筛选）
+- `PATCH /api/reconcile/{id}` - 确认匹配或标记异常
+- `GET /api/reconcile/stats` - 获取对账统计
+
+### 投手消耗上报接口
+- `POST /api/ad-spend` - 创建消耗上报
+  - 如果触发30%预警，返回格式：
+    ```json
+    {
+      "data": {...},
+      "warning": "金额与上一条差异较大，请确认",
+      "error": null
+    }
+    ```
+
+---
+
+## 前端约束
+
+### 页面要求
+- **表单页面**: 必须有加载态、错误提示、成功提示
+- **布局要求**: `/report/spend` 页面左边表单右边列表，移动端上下布局
+- **数据获取**: 渠道下拉必须从 `GET /api/channels` 获取，不要写死
+- **样式规范**: 不要写任何 inline style，统一用 Tailwind CSS
+
+### 环境变量
+- **API 地址**: 不允许在前端写死后端域名，统一从环境变量读取 `NEXT_PUBLIC_API_URL`
+- **Supabase 配置**: 使用 `NEXT_PUBLIC_SUPABASE_URL` 和 `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+### TypeScript 配置
+- **严格模式**: TypeScript 必须打开严格模式
+- **类型定义**: 所有 API 响应必须有明确的类型定义
+
+---
+
+## 安全与访问
+
+### 认证要求
+- **所有需要认证的接口**: 必须从请求中解析出用户，并根据角色限制访问
+- **JWT Token**: 使用 JWT 进行身份验证，token 存储在客户端（localStorage 或 cookie）
+
+### 数据库安全
+- **RLS 策略**: Supabase 表必须启用 RLS（Row Level Security）
+- **权限检查**: 后端代码不能跳过权限检查，必须在服务层和路由层都进行验证
+
+### CORS 配置
+- **生产环境**: 必须设置具体的前端域名，不要使用 `allow_origins=["*"]`
+- **开发环境**: 可以使用 `["*"]` 但需要明确标注
+
+---
+
+## 代码风格
+
+### TypeScript
+- **严格模式**: 必须打开 TypeScript 严格模式
+- **类型注解**: 所有函数参数和返回值必须有类型注解
+- **命名规范**: 使用 camelCase 命名变量和函数，PascalCase 命名组件和类
+
+### Python
+- **代码风格**: 遵循 PEP8
+- **依赖注入**: 使用 FastAPI 的 Depends 进行依赖注入
+- **类型提示**: 使用类型提示（Type Hints）
+- **命名规范**: 使用 snake_case 命名变量和函数，PascalCase 命名类
+
+### 错误处理
+- **统一错误格式**: 所有错误必须返回统一的响应格式
+- **异常捕获**: 在路由层和服务层都要进行异常捕获和错误处理
+- **日志记录**: 重要操作和错误必须记录日志
+
+---
+
+## 开发流程
+
+### 数据库迁移
+1. 使用 Alembic 创建迁移文件
+2. 在 Supabase Dashboard 中执行迁移
+3. 更新 RLS 策略
+
+### 功能开发顺序
+1. **第一阶段**: 基础功能（数据库、认证、项目和投手管理）
+2. **第二阶段**: 核心业务（投手消耗上报、财务收支录入）
+3. **第三阶段**: 高级功能（自动对账、月度报表、数据分析）
+4. **第四阶段**: 优化和完善（异常检测、权限控制、性能优化）
+
+### 测试要求
+- **单元测试**: 关键业务逻辑必须有单元测试
+- **集成测试**: API 接口必须有集成测试
+- **前端测试**: 关键页面和组件必须有测试
+
+---
+
+## 禁止事项
+
+1. ❌ **禁止使用其他框架**: 不能替换为 Express、Nest、Django、Laravel 等
+2. ❌ **禁止使用 SQLite**: 必须使用 Supabase PostgreSQL
+3. ❌ **禁止写死数据**: 渠道列表、项目列表等必须从 API 获取
+4. ❌ **禁止跳过权限检查**: 所有接口必须进行权限验证
+5. ❌ **禁止使用 inline style**: 必须使用 Tailwind CSS
+6. ❌ **禁止硬编码域名**: API 地址必须从环境变量读取
+7. ❌ **禁止修改业务规则**: 异常阈值、对账规则等固定规则不能更改
+
+---
+
+## 文档要求
+
+- **API 文档**: 使用 FastAPI 自动生成的 Swagger 文档
+- **代码注释**: 关键业务逻辑必须有中文注释
+- **README**: 项目根目录必须有 README.md，说明如何启动和部署
+
+---
+
+**最后更新**: 2024-11-04
+**维护者**: 开发团队
+

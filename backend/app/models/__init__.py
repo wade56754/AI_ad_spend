@@ -5,6 +5,7 @@ from app.models.finance_ledger import LedgerTransaction
 from app.models.reconciliation import Reconciliation
 from app.models.operator_salary import OperatorSalary
 from app.models.monthly_reports import MonthlyProjectPerformance, MonthlyOperatorPerformance
+from app.models.channel import Channel, MonthlyChannelPerformance
 
 __all__ = [
     "Project",
@@ -15,5 +16,7 @@ __all__ = [
     "OperatorSalary",
     "MonthlyProjectPerformance",
     "MonthlyOperatorPerformance",
+    "Channel",
+    "MonthlyChannelPerformance",
 ]
 

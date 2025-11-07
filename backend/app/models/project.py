@@ -20,6 +20,11 @@ class Project(Base):
     spend_reports = relationship("AdSpendDaily", back_populates="project", cascade="all, delete-orphan")
     ledger_transactions = relationship("LedgerTransaction", back_populates="project")
     operators = relationship("Operator", back_populates="project")
+    channels = relationship(
+        "Channel",
+        secondary="project_channels",
+        back_populates="projects"
+    )
 
 
 

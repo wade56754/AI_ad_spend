@@ -8,6 +8,7 @@ class AdSpendCreate(BaseModel):
     """创建投手消耗上报"""
     spend_date: date = Field(..., description="消耗日期")
     project_id: int = Field(..., description="项目ID")
+    channel_id: int = Field(..., description="渠道ID（必填）")
     country: Optional[str] = Field(None, max_length=50, description="国家/地区")
     operator_id: int = Field(..., description="投手ID")
     platform: Optional[str] = Field(None, max_length=50, description="投放平台")
@@ -23,6 +24,7 @@ class AdSpendResponse(BaseModel):
     id: int
     spend_date: date
     project_id: int
+    channel_id: Optional[int]
     country: Optional[str]
     operator_id: int
     platform: Optional[str]

@@ -1,109 +1,133 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+# AI 财务与投手管理系统（前端）
 
-<p align="center">
- The fastest way to build apps with Next.js and Supabase
-</p>
+基于 Next.js 14 + Supabase 的广告投手管理平台前端，实现投手日报、财务收支、渠道管理、自动对账与分析看板等核心业务。项目严格遵循 `ai_finance_devdoc_v_4.md` 与 `rules.md` 中的规范，已对接 FastAPI 后端所需的统一 API 返回格式。
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
-</p>
-<br/>
+## ✨ 功能总览
 
-## Features
+- **投手消耗上报**：录入日期、项目、平台、金额、备注等字段，支持异常预警提醒。
+- **财务收支录入**：收入 / 支出、币种、账户、手续费等多维度信息管理。
+- **渠道管理**：渠道列表维护、返点率、状态切换以及备注管理。
+- **自动对账**：基于金额差、日期差的匹配结果展示与过滤（待接后端终端数据）。
+- **权限与导航**：基于 Supabase Auth + 角色控制动态显示菜单（管理员、财务、投手等）。
+- **运营分析**：投手与项目维度的月度趋势图表展示（Recharts）。
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Middleware
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+## 🧱 技术栈
 
-## Demo
+| 层级 | 技术 | 说明 |
+| --- | --- | --- |
+| 框架 | [Next.js 14 App Router](https://nextjs.org) | 路由、服务端组件、Server Actions |
+| UI | [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) | 无内联样式，实现统一设计体系 |
+| 状态 | React Hooks + Context | 轻量级状态管理、封装 `useApi`/`useCurrentUser` |
+| 数据 | Supabase Auth & Storage | 用户认证、静态资产 |
+| 网络 | `lib/api.ts` | 统一 `fetch` 请求封装，固定 `{ data, error }` 输出 |
+| 图表 | [Recharts](https://recharts.org) | 运营报表展示 |
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+## 📁 目录结构
 
-## Deploy to Vercel
+```
+frontend/
+├── app/
+│   ├── (auth)/login/page.tsx            # 登录页面
+│   ├── (protected)/                    # 受保护业务路由
+│   │   ├── layout.tsx                  # 鉴权 & 布局注入 AppShell
+│   │   ├── page.tsx                    # 仪表盘
+│   │   ├── report/spend/page.tsx       # 投手日报上报
+│   │   ├── finance/ledger/page.tsx     # 财务收支录入
+│   │   ├── reconcile/page.tsx          # 自动对账结果
+│   │   ├── analytics/page.tsx          # 数据分析
+│   │   └── settings/...                # 项目 / 渠道 / 投手 / 角色管理
+│   └── layout.tsx                      # 根布局，挂载 AppShell
+├── components/
+│   ├── layout/                         # AppShell + Sidebar + Header
+│   ├── features/                       # 各业务模块组件（表单/表格/图表）
+│   └── ui/                             # shadcn/ui 封装组件
+├── hooks/                              # `useApi`, `useCurrentUser`
+├── lib/
+│   ├── api.ts                          # fetch 封装
+│   ├── api/*.ts                        # 业务级 API helper（可选）
+│   └── supabase/*                      # Supabase 客户端
+├── types/                              # 统一 TypeScript 类型定义
+├── middleware.ts                       # Supabase Auth 中间件
+├── tailwind.config.ts
+└── pnpm-lock.yaml / package.json
+```
 
-Vercel deployment will guide you through creating a Supabase account and project.
+> **提示**：后端（FastAPI + SQLAlchemy + Supabase）位于独立仓库，确保接口路径、权限返回结构与本前端保持一致。
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+## 🚀 快速开始
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+```bash
+# 安装依赖（推荐使用 pnpm）
+cd frontend
+pnpm install
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+# 复制环境变量模板
+cp .env.example .env.local
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+# 启动开发服务器
+pnpm dev
+```
 
-## Clone and run locally
+默认访问地址：[http://localhost:3000](http://localhost:3000)
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+### 必填环境变量
 
-2. Create a Next.js app using the Supabase Starter template npx command
+`.env.local` 中需配置以下字段（上线时请使用安全的生产值）：
 
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
+NEXT_PUBLIC_SUPABASE_URL=https://<your-supabase-project>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-or-publishable-key>
+```
 
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
+> **注意**：禁止硬编码后端域名，所有请求必须使用 `NEXT_PUBLIC_API_BASE_URL`。Supabase 使用 publishable key（兼容旧 anon key）。
 
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
+## 🧩 开发规范
 
-3. Use `cd` to change into the app's directory
+- **UI**：仅允许 Tailwind + shadcn/ui，禁止内联样式。
+- **请求**：统一通过 `lib/api.ts -> apiRequest()`，返回 `{ data, error }`。
+- **类型**：所有接口类型集中存放在 `types/`，禁止在组件内临时声明重复接口。
+- **权限**：`useCurrentUser` + `AppSidebar` 实现菜单和路由的角色控制；(protected)/layout 会请求 `/api/me`。
+- **目录**：遵循 `cursor_project_rules/knowledge_base.md` 与 `implementation-plan.mdc` 中的目录约束。
 
-   ```bash
-   cd with-supabase-app
-   ```
+## 🔌 接口约定
 
-4. Rename `.env.example` to `.env.local` and update the following:
+后端接口统一响应结构：
 
-  ```env
-  NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
-  ```
-  > [!NOTE]
-  > This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-  > Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-  > See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
+```json
+{
+  "data": ..., 
+  "error": null,
+  "meta": {},
+  "warning": "可选的业务提醒"
+}
+```
 
-  Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+前端 `useApi` 按照该格式自动处理 loading / error / 数据状态。
 
-5. You can now run the Next.js local development server:
+业务接口示例：
 
-   ```bash
-   npm run dev
-   ```
+- `POST /api/ad-spend` 投手日报上报（触发 30% 波动时返回 `warning`）
+- `POST /api/ledger` 财务收支录入
+- `GET /api/channels` 渠道列表
+- `GET /api/reconcile` 自动对账结果（支持 status/date 过滤）
+- `GET /api/reports/monthly` 运营分析数据
+- `GET /api/me` 当前用户角色与权限
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+## 📦 部署建议
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+1. 生产部署前运行 `pnpm build` 验证构建。
+2. 使用 Vercel / Supabase Hosting 或自建环境部署静态产物。
+3. 配置如下环境变量：
+   - `NEXT_PUBLIC_API_BASE_URL=https://<your-domain>/api`
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. 若需接入服务器端渲染 Auth，中间件已默认启用 Supabase Helper。
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+## 🤝 协作与文档
 
-## Feedback and issues
+- 项目规则：`cursor_project_rules/knowledge_base.md`
+- 开发计划：`implementation-plan.mdc`
+- 任务分工：Claude（后端）、bolt.new（前端原型）、Cursor（集成与部署）
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
-
-## More Supabase examples
-
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+欢迎根据业务场景扩展页面或组件。提交前请执行 `pnpm lint` 并确保遵循上述规范。

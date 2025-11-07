@@ -1,0 +1,60 @@
+# 项目名称
+AI 财务与投手管理系统
+
+# 技术栈约束
+- 前端必须使用：Next.js 14 (App Router) + TypeScript + Tailwind CSS
+- 后端必须使用：FastAPI + Pydantic + SQLAlchemy
+- 数据库为 Supabase (PostgreSQL)，不能使用本地 SQLite
+- 不要自动替换为 Express、Nest、Django、Laravel 等其他框架
+
+# 目录结构约定
+- frontend/app/... 用于页面
+- frontend/lib/... 放 API 封装、supabase 客户端
+- backend/app/main.py 是入口
+- backend/app/routers/... 放每个模块的路由
+- backend/app/schemas/... 放 pydantic schema
+- backend/app/services/... 放业务逻辑
+- alembic 用于数据库迁移
+
+# 业务固定规则（禁止更改）
+- 日报异常阈值：与同投手、同项目、同平台上一条记录相比，金额波动 > 30% 时，需要返回 warning，但不能阻止保存。
+- 自动对账匹配规则：金额差 ≤ 5% 且 日期差 ≤ 1 天 → 视为自动匹配；否则标记为 need_review。
+- 渠道（channel）为必填字段，投手上报广告消耗时必须挂渠道。
+- 所有写操作记录操作人和时间，便于审计。
+
+# 角色与权限（必须按此实现）
+- operator：广告投手，只能创建和查看「自己的」日报，不允许改别人数据。
+- finance：财务，可以查看全部收支记录、对账结果，可以执行对账。
+- account_mgr：户管/渠道管理，可以管理渠道、下户情况、查看渠道绩效。
+- manager：管理层，只读查看所有统计和分析数据。
+- admin：系统管理员，拥有全部权限。
+- 前端页面要根据角色做路由保护，不同角色看不同菜单。
+
+# API 约定
+- 所有接口返回统一结构：
+  { "data": ..., "error": null | string, "meta": {} }
+- 新增渠道相关接口：
+  - GET /api/channels
+  - POST /api/channels
+  - GET /api/channels/stats
+- 对账接口：
+  - POST /api/reconcile/run
+  - GET /api/reconcile?status=...
+- ad-spend 接口提交后，如果触发30%预警，需要返回：
+  { "data": {...}, "warning": "金额与上一条差异较大，请确认", "error": null }
+
+# 前端约束
+- 表单页面必须有加载态、错误提示、成功提示
+- /report/spend 页面左边表单右边列表，移动端上下布局
+- 渠道下拉要从 GET /api/channels 获取，不要写死
+- 不要写任何 inline style，统一用 Tailwind
+
+# 安全与访问
+- 所有需要认证的接口必须从请求中解析出用户，并根据角色限制访问
+- Supabase 表启用 RLS，Cursor 生成的后端代码不能跳过权限检查
+
+# 代码风格
+- TypeScript 打开严格模式
+- Python 遵循 PEP8，使用依赖注入写 FastAPI
+- 不允许在前端写死后端域名，统一从环境变量读取 NEXT_PUBLIC_API_URL
+
